@@ -397,9 +397,65 @@ void read_serial_command()
         SerialCom->println("stop");
         break;
     }
+  }
+}
 
+float short_range_dist (int ADCval){
+  //Replace with derived formula
+  float dist = 11.724/ADCval *(5/1023.0) - 0.24;
+  return dist;
+}
+
+float long_range_dist (int ADCval){
+  //Replace with derived formula
+  float dist = 20.9/ADCval *(5/1023.0);
+  return dist;
+}
+
+void orientation (){
+  // Check readings, one will be max range, lowest voltage as voltage is inverse to distance
+  float diff = 10;
+  int long1ADC = analogRead(long1);
+  int long2ADC = analogRead(long2);
+  int short1ADC = analogRead(short1);
+  int short2ADC = analogRead(short2);
+  
+  minLong =  long1ADC < long2ADC ? long1 : long2;
+  minShort = short1ADC < short2ADC ? short1 : short2;
+
+  if (short1ADC < short2ADC){
+    front = long1;
+    back = long2;
+    left = short2;
+    right = short1;
+  } else {
+    front = long2;
+    back = long1;
+    left = short1;
+    right = short2;
   }
 
+  //Tune to a small movement
+  speed_val = 100;
+  float gain = 0.1;
+  int backADC = analogRead(back);
+  float priorBackDist = long_range_dist(backADC);
+  int leftADC = analogRead(left);
+  float priorLeftDist = short_range_dist(leftADC);
+
+  while(|diff| > 0.5*2){
+    ccw();
+    delay(10);
+    backADC = analogRead(back);
+    float backDist = long_range_dist(backADC);
+    leftADC = analogRead(left);
+    float leftDist = short_range_dist(leftADC);
+
+    diff = priorBackDist + priorLeftDist - backDist - leftDist;
+    speed_val = gain * diff;
+    priorBackDist = backDist;
+    priorLeftDist = leftDist;
+  }
 }
 
 //----------------------Motor moments------------------------
