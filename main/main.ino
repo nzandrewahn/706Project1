@@ -30,7 +30,7 @@ void setup()
 void loop()
 {
 
-    // Put your main code here, to run repeatedly:
+    //Put your main code here, to run repeatedly:
     static STATE machine_state = INITIALISING; // start from the sate INITIALIING
     switch (machine_state)
     {
@@ -49,8 +49,6 @@ void loop()
 
 
 STATE initialising(void){
-
-  
   return RUNNING;
 }
 
