@@ -58,6 +58,11 @@ int left_dist();
 int right_dist();
 int front_dist();
 
+//Tuning Parameters
+int Kd = 0;
+int Kp = 0;
+int Ki = 0;
+
 //Serial Pointer
 HardwareSerial *SerialCom;
 
