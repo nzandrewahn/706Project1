@@ -130,6 +130,7 @@ STATE running()
   {
 
     int error = WALL_DISTANCE - newLeft;
+    int thePast = [];
 
     if (error > 0)
     {
