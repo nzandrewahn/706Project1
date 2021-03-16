@@ -118,6 +118,7 @@ STATE running()
   // Store values
   int prevLeft;
   int frontDist;
+  int cornerCount = 0;
 
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
   while (frontDist < FRONT_DISTANCE_LIMIT)
@@ -145,9 +146,10 @@ STATE running()
     prevLeft = newLeft;
   }
 
-  // Increment no of corners
-
   // Run turning function
+
+  // Increment no of corners
+  cornerCount++;
 
   return RUNNING;
 }
