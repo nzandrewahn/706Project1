@@ -128,26 +128,17 @@ STATE running()
     if (error > 0)
     {
       //go right
-      left_front_motor.writeMicroseconds(ANTICLOCKWISE);
-      right_front_motor.writeMicroseconds(ANTICLOCKWISE);
-      left_rear_motor.writeMicroseconds(CLOCKWISE);
-      right_rear_motor.writeMicroseconds(CLOCKWISE);
+      GoEast();
     }
     else if (error < 0)
     {
       //go left
-      left_front_motor.writeMicroseconds(CLOCKWISE);
-      right_front_motor.writeMicroseconds(CLOCKWISE);
-      left_rear_motor.writeMicroseconds(ANTICLOCKWISE);
-      right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
+      GoWest();
     }
     else
     {
-      //go straight / do nothing
-      left_front_motor.writeMicroseconds(CLOCKWISE);
-      right_front_motor.writeMicroseconds(CLOCKWISE);
-      left_rear_motor.writeMicroseconds(CLOCKWISE);
-      right_rear_motor.writeMicroseconds(CLOCKWISE);
+      //go north
+      GoNorth();
     }
 
     frontDist = front_dist();
@@ -330,4 +321,37 @@ void fast_flash_double_LED_builtin()
       digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
     }
   }
+}
+
+// Motor Commands
+void GoNorth(void)
+{
+  left_front_motor.writeMicroseconds(CLOCKWISE);
+  right_front_motor.writeMicroseconds(CLOCKWISE);
+  left_rear_motor.writeMicroseconds(CLOCKWISE);
+  right_rear_motor.writeMicroseconds(CLOCKWISE);
+}
+
+void GoSouth(void)
+{
+  left_front_motor.writeMicroseconds(ANTICLOCKWISE);
+  right_front_motor.writeMicroseconds(ANTICLOCKWISE);
+  left_rear_motor.writeMicroseconds(ANTICLOCKWISE);
+  right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
+}
+
+void GoEast(void)
+{
+  left_front_motor.writeMicroseconds(ANTICLOCKWISE);
+  right_front_motor.writeMicroseconds(ANTICLOCKWISE);
+  left_rear_motor.writeMicroseconds(CLOCKWISE);
+  right_rear_motor.writeMicroseconds(CLOCKWISE);
+}
+
+void GoWest(void)
+{
+  left_front_motor.writeMicroseconds(CLOCKWISE);
+  right_front_motor.writeMicroseconds(CLOCKWISE);
+  left_rear_motor.writeMicroseconds(ANTICLOCKWISE);
+  right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
 }
