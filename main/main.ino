@@ -23,7 +23,7 @@
 //#define NO_HC-SR04 //Uncomment of HC-SR04 ultrasonic ranging sensor is not attached.
 //#define NO_BATTERY_V_OK //Uncomment of BATTERY_V_OK if you do not care about battery damage.
 
-#define WALL_DISTANCE (15)
+#define WALL_DISTANCE (10)
 #define FRONT_DISTANCE_LIMIT (15)
 #define ANTICLOCKWISE (1000)
 #define CLOCKWISE (2000)
@@ -60,7 +60,7 @@ int front_dist();
 void LeftDistanceController();
 
 //Tuning Parameters
-int Kp = 50;
+int Kp = 30;
 int Kd = 0;
 int Ki = 0;
 
@@ -129,49 +129,38 @@ STATE running()
   {
 
     int avgDistance = (left_front_dist() + left_back_dist()) / 2;
-    int TOLERANCE = 3;
+    int TOLERANCE = 2;
     int error = WALL_DISTANCE - avgDistance;
-    int front_offsets[2] = {0};
-    int rear_offsets[2] = {0};
+    int front_offset = constrain(error*Kp,0,500);
+    int rear_offset = constrain(error*Kp,0,500);
 
-    Serial.print("Error: ");
-    Serial.println(error);
+    if ((error > TOLERANCE) || (error < -TOLERANCE)){
+      while (error > TOLERANCE || error < -TOLERANCE)
+      {
+        front_offset = constrain(error*Kp,-500,500);
+        rear_offset = -constrain(error*Kp,-500,500);
+        
+        left_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offset);
+        right_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offset);
+        left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + rear_offset);
+        right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + rear_offset);
   
-    while (error > TOLERANCE || error < TOLERANCE)
-    {      
-      left_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offsets[0]);
-      right_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offsets[1]);
-      left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE - rear_offsets[0]);
-      right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE - rear_offsets[1]);
-
-      avgDistance = (left_front_dist() + left_back_dist())/2;
-      error = WALL_DISTANCE - avgDistance;
-      
-      if (error < 0){
-        front_offsets[0] = 0;
-        front_offsets[1] = -constrain(error*Kp,0,500);
-        rear_offsets[0] = constrain(error*Kp,0,500);
-        rear_offsets[1] = 0;
-      } else if (error > 0){
-        front_offsets[0] = constrain(error*Kp,-500,500);
-        front_offsets[1] = 0;
-        rear_offsets[0] = 0;
-        rear_offsets[1] = -constrain(error*Kp,-500,500);
-      } else {
-          GoForwards();
+        avgDistance = (left_front_dist() + left_back_dist())/2;
+        error = WALL_DISTANCE - avgDistance;
+        Serial.print("Error: ");
+        Serial.println(error);
       }
-
-
-       
+    } else {
+      Serial.println("Going Forward");
+      // Run turning function
+      GoForwards(); 
     }
   }
 
-  // Run turning function
 
   // Increment no of corners
 
   stop();
-
   return RUNNING;
 }
 
