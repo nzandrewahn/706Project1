@@ -60,8 +60,8 @@ int front_dist();
 void LeftDistanceController();
 
 //Tuning Parameters
+int Kp = 50;
 int Kd = 0;
-int Kp = 5;
 int Ki = 0;
 
 //Serial Pointer
@@ -78,7 +78,6 @@ void setup(void)
   SerialCom->println("MECHENG706_Base_Code_25/01/2018");
   delay(1000);
   SerialCom->println("Setup....");
-  SerialCom->println("Andrew is a pain and will be documenting the variable names");
 
   delay(1000); //settling time but no really needed
 }
@@ -125,31 +124,36 @@ STATE running()
   int frontDist = front_dist();
   int cornerCount = 0;
 
-  Serial.print("front Distance: ");
-  Serial.println(frontDist);
-
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
-  while (frontDist > FRONT_DISTANCE_LIMIT)
+  while (true)
   {
 
-    //    int thePast[WINDOW_SIZE] = {};
-    //    int yaw = read_yaw();
-    LeftDistanceController(void);
+    int avgDistance = (left_front_dist() + left_back_dist()) / 2;
+    int TOLERANCE = 3;
+    int error = WALL_DISTANCE - avgDistance;
+    int front_offset = constrain(error*Kp,0,500);
+    int rear_offset = constrain(error*Kp,0,500);
 
-    /*
-    if (yaw < YAW_THRESHHOLD){
-      // Run yaw controller
-    } else if (yaw < YAW_THRESHHOLD)
+    Serial.print("Error: ");
+    Serial.println(error);
+  
+    while (error > TOLERANCE || error < TOLERANCE)
     {
-      //Run distance and controller  
+      
+      
+      left_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offset);
+      right_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offset);
+      left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE - rear_offset);
+      right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE - rear_offset);
+
+      avgDistance = (left_front_dist() + left_back_dist())/2;
+      error = WALL_DISTANCE - avgDistance;
+      front_offset = constrain(error*Kp,-500,500);
+      rear_offset = constrain(error*Kp,-500,500);
     }
-    */
+//    GoForwards();
+//    frontDist = front_dist();
 
-    Serial.print("front Distance: ");
-    Serial.println(frontDist);
-
-    GoForwards();
-    frontDist = front_dist();
   }
 
   // Run turning function
@@ -393,23 +397,4 @@ void TurnLeft(void)
   right_front_motor.writeMicroseconds(CLOCKWISE);
   left_rear_motor.writeMicroseconds(ANTICLOCKWISE);
   right_rear_motor.writeMicroseconds(CLOCKWISE);
-}
-
-void LeftDistanceController(void)
-{
-  int avgDistance = (left_front_dist() + left_back_dist()) / 2;
-  int tolerance = 3;
-
-  while ((avgDistance < (WALL_DISTANCE - tolerance)) || (avgDistance > (WALL_DISTANCE + tolerance)))
-  {
-    avgDistance = (left_front_dist() + left_back_dist()) / 2;
-
-    int error = WALL_DISTANCE - avgDistance;
-    left_front_motor.writeMicroseconds(SERVO_STOP_VALUE - error * Kp);
-    right_front_motor.writeMicroseconds(SERVO_STOP_VALUE - error * Kp);
-    left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + error * Kp);
-    right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + error * Kp);
-  }
-
-  ]
 }
