@@ -63,7 +63,7 @@ int front_dist();
 
 //Tuning Parameters
 int Kd = 0;
-int Kp = 0;
+int Kp = 30;
 int Ki = 0;
 
 //Serial Pointer
@@ -80,9 +80,8 @@ void setup(void)
   SerialCom->println("MECHENG706_Base_Code_25/01/2018");
   delay(1000);
   SerialCom->println("Setup....");
-  SerialCom->println("Andrew is a pain and will be documenting the variable names")
 
-      delay(1000); //settling time but no really needed
+  delay(1000); //settling time but no really needed
 }
 
 void loop(void) //main loop
@@ -113,7 +112,7 @@ STATE initialising()
   SerialCom->println("Enabling Motors...");
   enable_motors();
   SerialCom->println("RUNNING STATE...");
-  orientation();
+  //  orientation();
   if (!is_battery_voltage_OK())
   {
     SerialCom->println("Battery is not okay...");
@@ -133,31 +132,32 @@ STATE running()
   int frontDist = front_dist();
 
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
-  while (frontDist < FRONT_DISTANCE_LIMIT)
-  {
-    if (yaw > YAW_TOLERANCE)
-    {
-      //run yaw controller
-    }
-    else
-    {
-      //run straight controller
-      goStraight();
-    }
-  }
+  //  while (frontDist < FRONT_DISTANCE_LIMIT)
+  //  {
+  //    if (yaw > YAW_TOLERANCE)
+  //    {
+  //      //run yaw controller
+  //    }
+  //    else
+  //    {
+  //      //run straight controller
+  //    }
+  //  }
+
+  goStraight();
 
   // Run turning function
   // Turn 90 deg
-  turn_90();
+  //  turn_90();
 
   // Increment no of corners
-  cornerCount++;
+  //  cornerCount++;
 
   // Check if turning count is higher than 4 if yes then return
-  if (cornerCount > 4)
-  {
-    return STOPPED;
-  }
+  //  if (cornerCount > 4)
+  //  {
+  //    return STOPPED;
+  //  }
 
   return RUNNING;
 }
@@ -369,16 +369,13 @@ void GoBackwards(void)
 ////////////////// Controllers
 void goStraight(void)
 {
-  // Store values
-  int frontDist = front_dist();
-  int cornerCount = 0;
-
-  // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
   int avgDistance = (left_front_dist() + left_back_dist()) / 2;
   int TOLERANCE = 2;
   int error = WALL_DISTANCE - avgDistance;
   int front_offset = constrain(error * Kp, 0, 500);
   int rear_offset = constrain(error * Kp, 0, 500);
+
+  Serial.println("Entered Function");
 
   if ((error > TOLERANCE) || (error < -TOLERANCE))
   {
