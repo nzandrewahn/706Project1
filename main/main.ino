@@ -31,7 +31,9 @@
 #define ANTICLOCKWISE (1000)
 #define CLOCKWISE (2000)
 #define STOP (1500)
+#define SERVO_STOP_VALUE (1500)
 #define WINDOW_SIZE (300)
+#define YAW_THRESHHOLD (500)
 
 //State machine states
 enum STATE
@@ -111,53 +113,51 @@ STATE initialising()
   SerialCom->println("Enabling Motors...");
   enable_motors();
   SerialCom->println("RUNNING STATE...");
+  orientation();
+  if (!is_battery_voltage_OK())
+  {
+    SerialCom->println("Battery is not okay...");
+    return INITIALISING;
+  }
+
   return RUNNING;
 }
 
 STATE running()
 {
-
-  // Check if turning count is higher than 4 if yes then return
-
-  // Read Sensor values
-  int newLeft = left_dist();
-
-  // Store values
-  int prevLeft;
-  int frontDist;
   int cornerCount = 0;
+
+  //Read initial sensor value to decide which controller
+  int yaw = read_yaw();
+#define YAW_TOLERANCE (3)
+  int frontDist = front_dist();
 
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
   while (frontDist < FRONT_DISTANCE_LIMIT)
   {
-
-    int error = WALL_DISTANCE - newLeft;
-    int thePast[WINDOW_SIZE] = [];
-
-    if (error > 0)
+    if (yaw > YAW_TOLERANCE)
     {
-      //go right
-      GoEast();
-    }
-    else if (error < 0)
-    {
-      //go left
-      GoWest();
+      //run yaw controller
     }
     else
     {
-      //go north
-      GoNorth();
+      //run straight controller
+      goStraight();
     }
-
-    frontDist = front_dist();
-    prevLeft = newLeft;
   }
 
   // Run turning function
+  // Turn 90 deg
+  turn_90();
 
   // Increment no of corners
   cornerCount++;
+
+  // Check if turning count is higher than 4 if yes then return
+  if (cornerCount > 4)
+  {
+    return STOPPED;
+  }
 
   return RUNNING;
 }
@@ -204,17 +204,33 @@ STATE stopped()
 
 ////////// Reading Sensor
 
-int left_dist()
+////////// Reading Sensor
+
+int left_front_dist()
 {
-  return 1;
+  int Dis2 = 1 / (0.0005 * analogRead(A7) - 0.0101);
+  return Dis2;
 }
 
-int right_dist()
+int left_back_dist()
 {
-  return 1;
+  int Dis1 = 1 / (0.0005 * analogRead(A4) - 0.0078);
+  return Dis1;
 }
 
 int front_dist()
+{
+  int Dis4 = (1 / (0.0002 * analogRead(A15) - 0.0051) - 2.5);
+  return Dis4;
+}
+
+int back_dist()
+{
+  int Dis3 = (1 / (0.0002 * analogRead(A11) - 0.0068) - 2.5);
+  return Dis3;
+}
+
+int read_yaw()
 {
   return 1;
 }
@@ -337,9 +353,9 @@ void fast_flash_double_LED_builtin()
 void GoForwards(void)
 {
   left_front_motor.writeMicroseconds(CLOCKWISE);
-  right_front_motor.writeMicroseconds(CLOCKWISE);
+  right_front_motor.writeMicroseconds(ANTICLOCKWISE);
   left_rear_motor.writeMicroseconds(CLOCKWISE);
-  right_rear_motor.writeMicroseconds(CLOCKWISE);
+  right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
 }
 
 void GoBackwards(void)
@@ -350,34 +366,189 @@ void GoBackwards(void)
   right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
 }
 
-void StrafeRight(void)
+////////////////// Controllers
+void goStraight(void)
 {
-  left_front_motor.writeMicroseconds(ANTICLOCKWISE);
-  right_front_motor.writeMicroseconds(ANTICLOCKWISE);
-  left_rear_motor.writeMicroseconds(CLOCKWISE);
-  right_rear_motor.writeMicroseconds(CLOCKWISE);
+  // Store values
+  int frontDist = front_dist();
+  int cornerCount = 0;
+
+  // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
+  int avgDistance = (left_front_dist() + left_back_dist()) / 2;
+  int TOLERANCE = 2;
+  int error = WALL_DISTANCE - avgDistance;
+  int front_offset = constrain(error * Kp, 0, 500);
+  int rear_offset = constrain(error * Kp, 0, 500);
+
+  if ((error > TOLERANCE) || (error < -TOLERANCE))
+  {
+    while (error > TOLERANCE || error < -TOLERANCE)
+    {
+      front_offset = constrain(error * Kp, -500, 500);
+      rear_offset = -constrain(error * Kp, -500, 500);
+
+      left_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offset);
+      right_front_motor.writeMicroseconds(SERVO_STOP_VALUE + front_offset);
+      left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + rear_offset);
+      right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + rear_offset);
+
+      avgDistance = (left_front_dist() + left_back_dist()) / 2;
+      error = WALL_DISTANCE - avgDistance;
+      Serial.print("Error: ");
+      Serial.println(error);
+    }
+  }
+  else
+  {
+    Serial.println("Going Forward");
+    // Run turning function
+    GoForwards();
+  }
 }
 
-void StrafeLeft(void)
+void turn_90(void)
 {
-  left_front_motor.writeMicroseconds(CLOCKWISE);
-  right_front_motor.writeMicroseconds(CLOCKWISE);
-  left_rear_motor.writeMicroseconds(ANTICLOCKWISE);
-  right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
+  float leftFrontDist, leftBackDist, dist, angle;
+  float error = 20; //initialise error to garbage value
+
+  int t, cwTurn, strafeRight, frontControl, rearControl;
+  int cwGain = 1500;
+  int strafeGain = 50;
+  int separationDist = 19;
+  int backDist = back_dist();
+
+  int tinit = millis();
+
+  while ((backDist > 30) || (backDist < 2) || t < 1000)
+  {
+    backDist = back_dist();
+    t = millis() - tinit;
+    left_front_motor.writeMicroseconds(2000);
+    left_rear_motor.writeMicroseconds(2000);
+    right_rear_motor.writeMicroseconds(2000);
+    right_front_motor.writeMicroseconds(2000);
+  }
+
+  while (((abs(angle) > 0.0349) || (abs(error) > 0.2)) && (t < 2000))
+  {
+    leftFrontDist = left_front_dist();
+    leftBackDist = left_back_dist();
+    //distance from the wall
+    dist = (leftFrontDist + leftBackDist) / 2;
+    //approximate sin theta to theta
+    angle = (leftFrontDist - leftBackDist) / separationDist;
+
+    if ((angle < 3.14 / 8) && (angle > -3.14 / 8))
+    {
+      //Reference angle is 0, control signal for turning CCW
+      cwTurn = angle * cwGain;
+      //6.2 = 15 - 8.8 (dist from centre of robot to sensor)
+      error = 6.2 - dist;
+      //Control signal for strafing right
+      strafeRight = error * strafeGain;
+      strafeRight = (strafeRight > 500) ? 500 : strafeRight;
+    }
+    else
+    {
+      cwTurn = 500;
+      strafeRight = 0;
+    }
+
+    //Control signal for front motors
+    frontControl = (cwTurn + strafeRight > 500) ? 500 : cwTurn + strafeRight;
+    frontControl = (cwTurn + strafeRight < -500) ? -500 : frontControl;
+
+    //Control signal for rear motors
+    rearControl = (cwTurn - strafeRight > 500) ? 500 : -cwTurn - strafeRight;
+    rearControl = (cwTurn - strafeRight < -500) ? -500 : rearControl;
+
+    left_front_motor.writeMicroseconds(1500 + frontControl);
+    left_rear_motor.writeMicroseconds(1500 + rearControl);
+    right_rear_motor.writeMicroseconds(1500 + rearControl);
+    right_front_motor.writeMicroseconds(1500 + frontControl);
+
+    SerialCom->print("angle = ");
+    SerialCom->println(angle);
+    SerialCom->print(", error = ");
+    SerialCom->println(error);
+    SerialCom->println(t);
+
+    //If the control signals are low for too long, start the timer to quit so that the motors don't burn out
+    if ((abs(strafeRight) < 50) && (abs(cwTurn) < 50))
+    {
+      t = t + millis() - tinit;
+    }
+    else
+    {
+      t = 0;
+    }
+  }
 }
 
-void TurnRight(void)
+void orientation(void)
 {
-  left_front_motor.writeMicroseconds(CLOCKWISE);
-  right_front_motor.writeMicroseconds(ANTICLOCKWISE);
-  left_rear_motor.writeMicroseconds(CLOCKWISE);
-  right_rear_motor.writeMicroseconds(ANTICLOCKWISE);
-}
+  float separationDist = 19;
+  float leftFrontDist, leftBackDist, dist;
+  float error = 6.2;
+  float angle = 3.14 / 2;
 
-void TurnLeft(void)
-{
-  left_front_motor.writeMicroseconds(ANTICLOCKWISE);
-  right_front_motor.writeMicroseconds(CLOCKWISE);
-  left_rear_motor.writeMicroseconds(ANTICLOCKWISE);
-  right_rear_motor.writeMicroseconds(CLOCKWISE);
+  int ccwTurn, strafeRight, frontControl, rearControl, tinit;
+  int ccwGain = 1500;
+  int strafeGain = 50;
+  int t = 0;
+
+  while (((abs(angle) > 0.0349) || (abs(error) > 0.2)) && (t < 2000))
+  {
+    leftFrontDist = left_front_dist();
+    leftBackDist = left_back_dist();
+    //distance from the wall
+    dist = (leftFrontDist + leftBackDist) / 2;
+    //approximate sin theta to theta
+    angle = (leftFrontDist - leftBackDist) / separationDist;
+
+    if ((angle < 3.14 / 8) && (angle > -3.14 / 8))
+    {
+      //Reference angle is 0, control signal for turning CCW
+      ccwTurn = angle * ccwGain;
+      //6.2 = 15 - 8.8 (dist from centre of robot to sensor)
+      error = 6.2 - dist;
+      //Control signal for strafing right
+      strafeRight = error * strafeGain;
+      strafeRight = (strafeRight > 500) ? 500 : strafeRight;
+    }
+    else
+    {
+      ccwTurn = 500;
+      strafeRight = 0;
+    }
+
+    //Control signal for front motors
+    frontControl = (-ccwTurn + strafeRight > 500) ? 500 : -ccwTurn + strafeRight;
+    frontControl = (-ccwTurn + strafeRight < -500) ? -500 : frontControl;
+
+    //Control signal for rear motors
+    rearControl = (-ccwTurn - strafeRight > 500) ? 500 : -ccwTurn - strafeRight;
+    rearControl = (-ccwTurn - strafeRight < -500) ? -500 : rearControl;
+
+    left_front_motor.writeMicroseconds(1500 + frontControl);
+    left_rear_motor.writeMicroseconds(1500 + rearControl);
+    right_rear_motor.writeMicroseconds(1500 + rearControl);
+    right_front_motor.writeMicroseconds(1500 + frontControl);
+
+    SerialCom->print("angle = ");
+    SerialCom->println(angle);
+    SerialCom->print(", error = ");
+    SerialCom->println(error);
+    SerialCom->println(t);
+
+    //If the control signals are low for too long, start the timer to quit so that the motors don't burn out
+    if ((abs(strafeRight) < 50) && (abs(ccwTurn) < 50))
+    {
+      t = t + millis() - tinit;
+    }
+    else
+    {
+      t = 0;
+    }
+  }
 }
