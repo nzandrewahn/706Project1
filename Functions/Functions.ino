@@ -25,11 +25,11 @@ float separationDist = 19; //19 cm between the two left sensors
 
 
 //Set these values
-int sensorPin = 13;             //define the pin that gyro is connected
+int sensorPin = 12;             //define the pin that gyro is connected
 int T = 100;                    // T is the time of one loop
 int sensorValue = 0;            // read out value of sensor
 float gyroSupplyVoltage = 5;    // supply voltage for gyro
-float gyroZeroVoltage = 510;      // the value of voltage when gyro is zero
+float gyroZeroVoltage = 509;      // the value of voltage when gyro is zero
 float gyroSensitivity = 0.007;  // gyro sensitivity unit is (mv/degree/second) get from datasheet
 float rotationThreshold = 1.5;  // because of gyro drifting, defining rotation angular velocity  less than                                                        // this value will not be ignored
 float gyroRate = 0;             // read out value of sensor in voltage
@@ -43,7 +43,7 @@ void setup(void){
   SerialCom ->println("Starting");
   enable_motors();
   //orientation();
-  turn_90();
+  turn_90_gyro();
   stop();
 }
 void loop(void){}
@@ -148,13 +148,13 @@ void turn_90_gyro(void){
   int tinit, t, motorControl;
   
   // convert the 0-1023 signal to 0-5v
-  while (abs(error) > 0.1){ //add more exit conditions if need be
+  while (abs(error) > 2){ //add more exit conditions if need be
     tinit = millis();
     gyroRate = (analogRead(sensorPin) * gyroSupplyVoltage) / 1023; 
     // find the voltage offset the value of voltage when gyro is zero (still)
     gyroRate -= (gyroZeroVoltage / 1023 * 5); 
     // read out voltage divided the gyro sensitivity to calculate the angular velocity
-    float angularVelocity = -gyroRate / gyroSensitivity;  // Ensure that +ve velocity is taken in the CW direction
+    float angularVelocity = gyroRate / gyroSensitivity;  // Ensure that +ve velocity is taken in the CW direction
     // if the angular velocity is less than the threshold, ignore it
     if ((angularVelocity >= rotationThreshold) || (angularVelocity <= -rotationThreshold)) { // we are running a loop in T. one second will run (1000/T).
       angleChange = angularVelocity / (1000 / T);
@@ -182,6 +182,8 @@ void turn_90_gyro(void){
     //may not be necessary, CHECK
     t = millis() - tinit;
 
+    SerialCom -> print ("error: ");
+    SerialCom -> println (error);
     SerialCom -> print ("time: ");
     SerialCom -> println(t);
 
