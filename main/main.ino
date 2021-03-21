@@ -112,7 +112,7 @@ STATE initialising()
   SerialCom->println("Enabling Motors...");
   enable_motors();
   SerialCom->println("RUNNING STATE...");
-  //  orientation();
+  orientation();
   if (!is_battery_voltage_OK())
   {
     SerialCom->println("Battery is not okay...");
@@ -127,24 +127,26 @@ STATE running()
   int cornerCount = 0;
 
   //Read initial sensor value to decide which controller
-  int yaw = read_yaw();
+  int yaw = 2;
 #define YAW_TOLERANCE (3)
   int frontDist = front_dist();
 
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
-  //  while (frontDist < FRONT_DISTANCE_LIMIT)
-  //  {
-  //    if (yaw > YAW_TOLERANCE)
-  //    {
-  //      //run yaw controller
-  //    }
-  //    else
-  //    {
-  //      //run straight controller
-  //    }
-  //  }
+    while (frontDist > FRONT_DISTANCE_LIMIT)
+    {
+      if (yaw > YAW_TOLERANCE)
+      {
+        //run yaw controller
+        
+      }
+      else
+      {
+        //run straight controller
+        goStraight();
+      }
+    }
 
-  goStraight();
+
 
   // Run turning function
   // Turn 90 deg
