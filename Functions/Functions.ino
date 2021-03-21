@@ -21,6 +21,21 @@ const byte back_sensor = A11;
 const byte front_sensor = A15;
 
 int speed_val;
+float separationDist = 19;
+
+
+//Set these values
+int sensorPin = 13;             //define the pin that gyro is connected
+int T = 100;                    // T is the time of one loop
+int sensorValue = 0;            // read out value of sensor
+float gyroSupplyVoltage = 5;    // supply voltage for gyro
+float gyroZeroVoltage = 510;      // the value of voltage when gyro is zero
+float gyroSensitivity = 0.007;  // gyro sensitivity unit is (mv/degree/second) get from datasheet
+float rotationThreshold = 1.5;  // because of gyro drifting, defining rotation angular velocity  less than                                                        // this value will not be ignored
+float gyroRate = 0;             // read out value of sensor in voltage
+float currentAngle = 0;         // current angle calculated by angular velocity integral on
+
+
 void setup(void){
   stop();
   SerialCom = &Serial;
@@ -63,8 +78,9 @@ float back_dist (void){
 
 //INITIALISING
 void orientation (void) {
-  float separationDist = 19;
+  float separationDist = 19; //19 cm between the two left sensors
   float leftFrontDist, leftBackDist, dist; 
+  //Initialise to garbage values
   float error = 6.2;
   float angle = 3.14/2;
 
@@ -73,6 +89,7 @@ void orientation (void) {
   int strafeGain = 50;
   int t = 0;
   
+  //Keep going if the angle is more than 2 degrees or the distance is out by 0.2 cm and if the values are changing
   while(((abs(angle) > 0.0349) || (abs(error) > 0.2)) && (t < 2000)){
     leftFrontDist = left_front_dist();
     leftBackDist = left_back_dist();
@@ -122,8 +139,57 @@ void orientation (void) {
   }
 }
 
-void set_gyro(void){
+void turn_90_gyro(void){
+  /*Need to check positives and negatives, and adjust... also need to do a units check to make sure values aren't garbage*/
+  //Take CW to be positive
+  float currentAngle = 0;
+  float error = 90;
+  float rotationalGain = 26.2; //Gain of 1500/180*pi, same gain as the orientation code
+  float angleChange;
+  int tinit, t, motorControl;
   
+  // convert the 0-1023 signal to 0-5v
+  while (abs(error) > 0.1){ //add more exit conditions if need be
+    tinit = millis();
+    gyroRate = (analogRead(sensorPin) * gyroSupplyVoltage) / 1023; 
+    // find the voltage offset the value of voltage when gyro is zero (still)
+    gyroRate -= (gyroZeroVoltage / 1023 * 5); 
+    // read out voltage divided the gyro sensitivity to calculate the angular velocity
+    float angularVelocity = -gyroRate / gyroSensitivity;  // Ensure that +ve velocity is taken in the CW direction
+    // if the angular velocity is less than the threshold, ignore it
+    if ((angularVelocity >= rotationThreshold) || (angularVelocity <= -rotationThreshold)) { // we are running a loop in T. one second will run (1000/T).
+      angleChange = angularVelocity / (1000 / T);
+      
+      currentAngle += angleChange; //check sign
+    }  
+    
+    // keep the angle between 0-360 - for P control, don't
+    /*if (currentAngle < 0)    {
+      currentAngle += 360;
+    }  else if (currentAngle > 359) {
+      currentAngle -= 360;
+    } */
+    
+    error = 90 - currentAngle;
+
+    motorControl = error * rotationalGain;
+    motorControl = constrain(motorControl, -500, 500);
+
+    left_font_motor.writeMicroseconds(1500 + motorControl);
+    left_rear_motor.writeMicroseconds(1500 + motorControl);
+    right_rear_motor.writeMicroseconds(1500 + motorControl);
+    right_font_motor.writeMicroseconds(1500 + motorControl);
+
+    //may not be necessary, CHECK
+    t = millis() - tinit;
+
+    SerialCom -> print ("time: ");
+    SerialCom -> println(t);
+
+    delay (T - t);
+  }
+  
+  stop();
 }
 
 void turn_90 (void){
@@ -137,13 +203,8 @@ void turn_90 (void){
   int backDist = back_dist();
 
   int tinit = millis();
-  
-  /*while(1){
-  backDist = back_dist();
-  SerialCom -> print("backDist: ");
-  SerialCom -> println(backDist);
-  }*/
 
+  //turns for an amount to get sensors past the corner - replace with gyro code
   while((backDist > 30) || (backDist < 2) || t < 1000){
     backDist = back_dist();
     t = millis() - tinit;
@@ -152,7 +213,7 @@ void turn_90 (void){
     right_rear_motor.writeMicroseconds(2000);
     right_font_motor.writeMicroseconds(2000);
   }
-
+  
   while(((abs(angle) > 0.0349) || (abs(error) > 0.2)) && (t < 2000)){
     leftFrontDist = left_front_dist();
     leftBackDist = left_back_dist();
@@ -200,8 +261,23 @@ void turn_90 (void){
       t = 0;
     }
   }
+}
 
+int yawController (void){
+  /*Returns the control signal for a yaw controller, can be integrated within the go straight for more performance
+  We should actually be able to superimpose all 3 control signals together, I'll discuss with Andrew more in the lab*/
+  int ccwGain = 1500; //same as initialising gain
+  int ccwTurn;
+  float leftFrontDist, leftBackDist, angle;
   
+  leftFrontDist = left_front_dist();
+  leftBackDist = left_back_dist();
+
+  //approximate sin theta to theta
+  angle = (leftFrontDist - leftBackDist)/separationDist;
+  ccwTurn = angle * ccwGain;
+  ccwTurn = constrain(ccwTurn, -500, 500);
+  return ccwTurn;
 }
 
 //RUNNING
