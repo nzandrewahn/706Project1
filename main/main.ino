@@ -146,7 +146,7 @@ STATE running()
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
   goStraight();
 
-  stop();
+  //stop();
   
   // Run turning function
   // Turn 90 deg
@@ -377,7 +377,7 @@ void goStraight(void)
   Serial.print("forward error: ");
   Serial.println(forward_error);
 
-  while(abs(forward_error) > 0.1){
+  while(abs(forward_error) > 1){
     forward_error = FRONT_DISTANCE_LIMIT - front_dist();
     forward_control = forward_error * forward_gain;
 
@@ -397,10 +397,10 @@ void goStraight(void)
     right_front_motor.writeMicroseconds(SERVO_STOP_VALUE + right_front_motor_control);
     left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + left_rear_motor_control);
     right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + right_rear_motor_control);    
-  Serial.print("left error");
-  Serial.println(left_control);
-  Serial.print("forward error: ");
-  Serial.println(left_error);
+    Serial.print("left error: ");
+    Serial.print(left_control);
+    Serial.print("forward error: ");
+    Serial.println(forward_control);
   }
 
 /*  if ((left_error > TOLERANCE) || (left_error < -TOLERANCE))
