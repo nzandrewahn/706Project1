@@ -27,7 +27,6 @@
 //#define NO_BATTERY_V_OK //Uncomment of BATTERY_V_OK if you do not care about battery damage.
 
 #define WALL_DISTANCE (6.2)
-#define WALL_DISTANCE (15)
 #define FRONT_DISTANCE_LIMIT (5)
 #define ANTICLOCKWISE (1000)
 #define CLOCKWISE (2000)
@@ -68,14 +67,16 @@ int Kd = 0;
 int Kp = 30;
 int Ki = 0;
 int separationDist = 19;
+
 int T = 100;
-int gyroRate = 0;
-float currentAngle = 0;
-int sensorPin = 12;
+
+int gyroPin = 12;
 float gyroSupplyVoltage = 5;
 float gyroZeroVoltage = 509;
 float gyroSensitivity = 0.007;
 float rotationThreshold = 1.5;
+
+int cornerCount = 0;
 
 //Serial Pointer
 HardwareSerial *SerialCom;
@@ -137,23 +138,13 @@ STATE initialising()
 
 STATE running()
 {
-  int cornerCount = 0;
 
   //Read initial sensor value to decide which controller
   int yaw = 2;
   int frontDist = front_dist();
 
   // Decide which way to go based on new value vs old value, so the difference between the old and new value is the error and we exit when front is less than 15cm
-  while (frontDist > FRONT_DISTANCE_LIMIT)
-  {
-    goStraight();
-    frontDist = front_dist();
-  }
-  stop();
-  
-  // Run turning function
-  // Turn 90 deg
-  turn_90_gyro();
+  goStraight();
 
   // Increment no of corners
   cornerCount++;
@@ -363,11 +354,14 @@ void goStraight(void)
 {
   float avgDistance = (left_front_dist() + left_back_dist()) / 2;
   int TOLERANCE = 2;
-  int left_error = WALL_DISTANCE - avgDistance;
+  float left_error = WALL_DISTANCE - avgDistance;
+  
+  float left_I_error = 0;
+  float left_I_gain = 1;
   int Kp = 50;
-   int ccwGain = 2000; //same as initialising gain
-    int ccwTurn;
-    float leftFrontDist, leftBackDist, angle;
+  int ccwGain = 2000; //same as initialising gain
+  int ccwTurn;
+  float leftFrontDist, leftBackDist, angle;
 //  int front_offset = constrain(error * Kp, 0, 500);
 //  int rear_offset = constrain(error * Kp, 0, 500);
 
@@ -378,12 +372,16 @@ void goStraight(void)
   int forward_control = constrain(forward_error * forward_gain, -400, 400);
   
   int left_front_motor_control, right_front_motor_control, left_rear_motor_control, right_rear_motor_control;
+  int tinit, t;
 
   SerialCom -> println("Entered goStraight Function");
   SerialCom -> print("forward error: ");
   SerialCom -> println(forward_error);
 
+  t = millis();
+
   while(abs(forward_error) > 1){
+    tinit = t;
     forward_error = FRONT_DISTANCE_LIMIT - front_dist();
     forward_control = forward_error * forward_gain;
     
@@ -396,11 +394,19 @@ void goStraight(void)
 
     avgDistance = (leftFrontDist + leftBackDist) / 2;
     left_error = WALL_DISTANCE - avgDistance;
-    left_control = left_error * Kp; //INCREASE AND FIX
 
+    if (left_error < 3){
+      left_I_error += left_error;
+    } else{
+      left_I_error = 0;
+    }
+
+    left_control = constrain(left_error * Kp + left_I_error * left_I_gain, -500, 500); //INCREASE AND FIX
+    
     forward_error = FRONT_DISTANCE_LIMIT - front_dist();
     forward_control = constrain(forward_error * forward_gain, - 500 + abs(left_control), 500 - abs(left_control));
     
+    //constrain motor voltages to safe levels
     left_front_motor_control = constrain(forward_control + left_control - ccwTurn, -500, 500);
     right_front_motor_control = constrain(-forward_control + left_control - ccwTurn, -500, 500);
     left_rear_motor_control = constrain(forward_control - left_control - ccwTurn, -500, 500);
@@ -416,7 +422,16 @@ void goStraight(void)
     Serial.println(forward_error);
     Serial.print("CCW error: ");
     Serial.println(angle);
+    t = millis();
+
+    //Something is broken in the second loop of the second call of this function
+    delay(T - (t - tinit));
   }
+  
+  left_front_motor.writeMicroseconds(SERVO_STOP_VALUE);
+  right_front_motor.writeMicroseconds(SERVO_STOP_VALUE);
+  left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE);
+  right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE); 
 }
 
 
@@ -489,31 +504,11 @@ void orientation(void)
   SerialCom -> print("orientation finished");
 }
 
-
-// Yaw Controller
-int yawController (void){
-  /*Returns the control signal for a yaw controller, can be integrated within the go straight for more performance
-  We should actually be able to superimpose all 3 control signals together, I'll discuss with Andrew more in the lab*/
-  int ccwGain = 1500; //same as initialising gain
-  int ccwTurn;
-  float leftFrontDist, leftBackDist, angle;
-  
-  leftFrontDist = left_front_dist();
-  leftBackDist = left_back_dist();
-
-  //approximate sin theta to theta
-  angle = (leftFrontDist - leftBackDist)/separationDist;
-  ccwTurn = angle * ccwGain;
-  ccwTurn = constrain(ccwTurn, -500, 500);
-  return ccwTurn;
-}
-
-
-
 void turn_90_gyro(void){
   /*Need to check positives and negatives, and adjust... also need to do a units check to make sure values aren't garbage*/
   //Take CW to be positive
   float currentAngle = 0;
+  float gyroRate = 0;
   float error = 90;
   float rotationalGain = 26.2; //Gain of 1500/180*pi, same gain as the orientation code
   float angleChange, angularVelocity;
