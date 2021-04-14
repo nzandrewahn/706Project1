@@ -23,7 +23,7 @@
 //#define NO_HC-SR04 //Uncomment of HC-SR04 ultrasonic ranging sensor is not attached.
 //#define NO_BATTERY_V_OK //Uncomment of BATTERY_V_OK if you do not care about battery damage.
 
-#define WALL_DISTANCE (8)
+#define WALL_DISTANCE (7)
 #define FRONT_DISTANCE_LIMIT (6)
 #define ANTICLOCKWISE (1000)
 #define CLOCKWISE (2000)
@@ -354,7 +354,7 @@ void goStraight(void)
   float left_error = 0;     //Error from the distance of the wall that was set
   float left_I_error = 0;   //Integral of the left error
   float left_I_gain = 0.02;    //Left controller I gain
-  int left_P_gain = 35;    //Left controller P gain
+  int left_P_gain = 120;    //Left controller P gain
   int left_control;         //Control action for left controller
 
   float angle;              //The angle from being straight from the wall
@@ -384,10 +384,10 @@ void goStraight(void)
     avgDistance = (leftFrontDist + leftBackDist) / 2;
     left_error = WALL_DISTANCE - avgDistance;
 
-    if (abs(left_error) < 4) {
+    if (abs(left_error) < 4) { //4
       left_I_error += left_error;
     } else {
-      left_I_error = 0;
+      //left_I_error = 0;
     }
 
     left_control = constrain(int(left_error * left_P_gain + left_I_error * left_I_gain), -500, 500); // TUNE
@@ -398,7 +398,7 @@ void goStraight(void)
     ccwTurn = constrain(int(angle * ccwGain + ccw_I_error * ccw_I_gain), -500 + abs(left_control), 500 - abs(left_control));
 
     forward_error = FRONT_DISTANCE_LIMIT - front_dist();
-    forward_control = constrain(forward_error * forward_gain, - 500 + abs(left_control) + abs(ccwTurn), 500 - abs(left_control) - abs(ccwTurn));
+    forward_control = constrain(forward_error * forward_gain, - 400 + abs(left_control) + abs(ccwTurn), 400 - abs(left_control) - abs(ccwTurn));
 
     left_front_motor_control = constrain(forward_control + left_control - ccwTurn, -500, 500);
     right_front_motor_control = constrain(-forward_control + left_control - ccwTurn, -500, 500);
@@ -409,12 +409,12 @@ void goStraight(void)
     right_front_motor.writeMicroseconds(SERVO_STOP_VALUE + right_front_motor_control);
     left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + left_rear_motor_control);
     right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + right_rear_motor_control);
-    //Serial.print("left error: ");
-    //Serial.println(left_error);
-    Serial.print("forward error: ");
-    Serial.println(forward_error);
-   // Serial.print("CCW error: ");
-    //Serial.println(angle);
+//    Serial.print("left error: ");
+    Serial.println(left_error);
+//    Serial.print("forward error: ");
+//    Serial.println(left_control);
+//    Serial.print("CCW error: ");
+//    Serial.println(left_I_error);
   }
 
   left_front_motor.writeMicroseconds(SERVO_STOP_VALUE );
@@ -442,6 +442,8 @@ void orientation(void)
     leftBackDist = left_back_dist();
     //distance from the wall
     dist = (leftFrontDist + leftBackDist) / 2;
+    Serial.print("LOOK HERE");
+    Serial.println(dist);
     //approximate sin theta to theta
     angle = (leftFrontDist - leftBackDist) / separationDist;
 
