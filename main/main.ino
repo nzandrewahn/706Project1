@@ -23,7 +23,7 @@
 //#define NO_HC-SR04 //Uncomment of HC-SR04 ultrasonic ranging sensor is not attached.
 //#define NO_BATTERY_V_OK //Uncomment of BATTERY_V_OK if you do not care about battery damage.
 
-#define WALL_DISTANCE (7)
+#define WALL_DISTANCE (7.45)
 #define FRONT_DISTANCE_LIMIT (6)
 #define ANTICLOCKWISE (1000)
 #define CLOCKWISE (2000)
