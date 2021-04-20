@@ -55,16 +55,11 @@ Servo right_rear_motor;  // create servo object to control Vex Motor Controller 
 Servo right_front_motor; // create servo object to control Vex Motor Controller 29
 Servo turret_motor;
 
-float left_dist();
-float right_dist();
-float front_dist();
-int cornerCount = 0;
-bool complete = 0;
+int separationDist = 19; // Distance between the two IR sensors
+int cornerCount = 0;     // Number of corners currently turned
+bool complete = false;   // Checking if the obstacle has been completed
 
-// Distance between the two IR sensors
-int separationDist = 19;
-
-//Gyro variables
+//Gyro Variables
 int T = 100;
 int gyroPin = 12;
 float gyroSupplyVoltage = 5;
@@ -75,6 +70,9 @@ float gyroRate = 0;
 
 //Serial Pointer
 HardwareSerial *SerialCom;
+
+//Function Declarations
+float front_dist();
 
 void setup(void)
 {
@@ -133,6 +131,7 @@ STATE running()
 {
   //From the previous command the robot should be oriented
   orientation();
+  delay(200);
   goStraight();
 
   // Increment number of corners
@@ -142,7 +141,7 @@ STATE running()
   if (cornerCount >= 4)
   {
     stop();
-    complete = 1;
+    complete = true;
     return STOPPED;
   }
 
@@ -299,7 +298,7 @@ void enable_motors()
   right_rear_motor.attach(right_rear);   // attaches the servo on pin right_rear to turn Vex Motor Controller 29 On
   right_front_motor.attach(right_front); // attaches the servo on pin right_front to turn Vex Motor Controller 29 On
 }
-void stop() //Stop
+void stop() // Stopping function
 {
   left_front_motor.writeMicroseconds(1500);
   left_rear_motor.writeMicroseconds(1500);
@@ -430,7 +429,6 @@ void orientation(void)
   float leftFrontDist, leftBackDist, dist;
   float error = 6.2;
   float angle = 3.14 / 2;
-
   int ccwTurn, strafeRight, frontControl, rearControl, tinit;
   int ccwGain = 2000;
   int strafeGain = 100;
@@ -530,11 +528,13 @@ void turn_90_gyro(void)
       currentAngle += angleChange; //check sign
     }
 
+    //Calculating the error signal for the control loop
     error = 90 - currentAngle;
 
     motorControl = error * rotationalGain;
     motorControl = constrain(motorControl, -500, 500);
 
+    // Sending control signals to the motors
     left_front_motor.writeMicroseconds(1500 + motorControl);
     left_rear_motor.writeMicroseconds(1500 + motorControl);
     right_rear_motor.writeMicroseconds(1500 + motorControl);
