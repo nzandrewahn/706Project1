@@ -23,7 +23,7 @@
 //#define NO_HC-SR04 //Uncomment of HC-SR04 ultrasonic ranging sensor is not attached.
 //#define NO_BATTERY_V_OK //Uncomment of BATTERY_V_OK if you do not care about battery damage.
 
-#define WALL_DISTANCE (7.45)
+#define WALL_DISTANCE (7.6) //7.45
 #define FRONT_DISTANCE_LIMIT (6)
 #define ANTICLOCKWISE (1000)
 #define CLOCKWISE (2000)
@@ -131,7 +131,7 @@ STATE running()
 {
   //From the previous command the robot should be oriented
   orientation();
-  delay(200);
+  delay(300);
   goStraight();
 
   // Increment number of corners
@@ -347,7 +347,7 @@ void goStraight(void)
   float avgDistance = 0;    //Average distance from the left wall
   float left_error = 0;     //Error from the distance of the wall that was set
   float left_I_error = 0;   //Integral of the left error
-  float left_I_gain = 0.02; //Left controller I gain
+  float left_I_gain = 0.04; //Left controller I gain
   int left_P_gain = 120;    //Left controller P gain
   int left_control;         //Control action for left controller
 
@@ -410,8 +410,8 @@ void goStraight(void)
 
     Serial.print("left error: ");
     Serial.println(left_error);
-    Serial.print("forward error: ");
-    Serial.println(forward_error);
+    Serial.print("I error: ");
+    Serial.println(left_I_error);
     Serial.print("CCW error: ");
     Serial.println(angle);
   }
@@ -431,7 +431,7 @@ void orientation(void)
   float angle = 3.14 / 2;
   int ccwTurn, strafeRight, frontControl, rearControl, tinit;
   int ccwGain = 2000;
-  int strafeGain = 100;
+  int strafeGain = 120;
   int t = 0;
 
   while (((abs(angle) > 0.0349) || (abs(error) > 0.2)) && (t < 1000))
@@ -452,7 +452,7 @@ void orientation(void)
       //Reference angle is 0, control signal for turning CCW
       ccwTurn = constrain(int(angle * ccwGain), -500, 500);
 
-      error = WALL_DISTANCE - dist;
+      error = WALL_DISTANCE +0.2 - dist;
       //Control signal for strafing right, constrain so that when superimposed on ccwTurn, the combined signal will not exceed 500
       strafeRight = constrain(int(error * strafeGain), -500 + abs(ccwTurn), 500 - abs(ccwTurn));
     }
