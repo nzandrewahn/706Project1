@@ -404,6 +404,7 @@ void goStraight(void)
     left_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + left_rear_motor_control);
     right_rear_motor.writeMicroseconds(SERVO_STOP_VALUE + right_rear_motor_control);
 
+// Debugging Print Statements
 //    Serial.print("left error: ");
 //    Serial.println(left_error);
 //    Serial.print("forward error: ");
@@ -472,6 +473,7 @@ void orientation(void)
     right_rear_motor.writeMicroseconds(1500 + rearControl);
     right_front_motor.writeMicroseconds(1500 + frontControl);
 
+    // Debugging Print Statements
     //    SerialCom->print("angle = ");
     //    SerialCom->println(angle);
     //    SerialCom->print(", error = ");
